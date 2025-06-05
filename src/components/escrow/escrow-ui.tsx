@@ -8,7 +8,9 @@ import {
   useEscrowProgram,
   useEscrowProgramAccount,
 } from "./escrow-data-access";
+import { useWallet } from "@solana/wallet-adapter-react";
 
+// Very simple escrow creation component
 export function EscrowCreate() {
   const { make } = useEscrowProgram();
 
@@ -23,7 +25,8 @@ export function EscrowCreate() {
   );
 }
 
-export function EscrowCreateAsset() {
+// Very simple asset creation component
+export function CreateAsset() {
   const { createAsset } = useEscrowProgram();
 
   return (
@@ -40,9 +43,11 @@ export function EscrowCreateAsset() {
 export function EscrowList() {
   const { accounts, getProgramAccount } = useEscrowProgram();
 
+  // If the program account is loading, show a loading spinner
   if (getProgramAccount.isLoading) {
     return <span className="loading loading-spinner loading-lg"></span>;
   }
+  // If the program account is not found, show an alert
   if (!getProgramAccount.data?.value) {
     return (
       <div className="alert alert-info flex justify-center">
@@ -53,6 +58,7 @@ export function EscrowList() {
       </div>
     );
   }
+  // If the program account is found, show the escrow list
   return (
     <div className={"space-y-6"}>
       {accounts.isLoading ? (
@@ -77,30 +83,37 @@ export function EscrowList() {
 }
 
 function EscrowCard({ account }: { account: PublicKey }) {
-  const { accountQuery, takeMutation, vaultQuery } = useEscrowProgramAccount({
-    account,
-  });
+  const { accountQuery, takeMutation, vaultQuery, refundMutation } =
+    useEscrowProgramAccount({
+      account,
+    });
+  const { publicKey } = useWallet();
 
+  // Memoize the maker's public key, or "..." if the maker query is still loading
   const maker = useMemo(
     () => accountQuery.data?.maker.toString() ?? "...",
     [accountQuery.data?.maker]
   );
 
-  const mintA = useMemo(
-    () => accountQuery.data?.mintA.toString() ?? "...",
-    [accountQuery.data?.mintA]
+  // Memoize the mintA, or "..." if the mintA query is still loading
+  const mintX = useMemo(
+    () => accountQuery.data?.mintX.toString() ?? "...",
+    [accountQuery.data?.mintX]
   );
 
-  const mintB = useMemo(
-    () => accountQuery.data?.mintB.toString() ?? "...",
-    [accountQuery.data?.mintB]
+  // Memoize the mintB, or "..." if the mintB query is still loading
+  const mintY = useMemo(
+    () => accountQuery.data?.mintY.toString() ?? "...",
+    [accountQuery.data?.mintY]
   );
 
+  // Memoize the amount, or "..." if the amount query is still loading
   const amount = useMemo(
-    () => accountQuery.data?.recieve.toString() ?? "...",
-    [accountQuery.data?.recieve]
+    () => accountQuery.data?.amountY.toString() ?? "...",
+    [accountQuery.data?.amountY]
   );
 
+  // Memoize the vault amount, or "..." if the vault amount query is still loading
   const vaultAmount = useMemo(
     () =>
       vaultQuery.data?.value?.data?.parsed?.info?.tokenAmount?.uiAmount ??
@@ -108,13 +121,12 @@ function EscrowCard({ account }: { account: PublicKey }) {
     [vaultQuery.data?.value?.data?.parsed?.info?.tokenAmount?.uiAmount]
   );
 
-  // if (!counterQuery.data) {
-  //   return <></>;
-  // }
-
-  return accountQuery.isLoading ? (
-    <span className="loading loading-spinner loading-lg"></span>
-  ) : (
+  // If the escrow account is loading, show a loading spinner
+  if (accountQuery.isLoading) {
+    return <span className="loading loading-spinner loading-lg"></span>;
+  }
+  // If the escrow account is not loading, show the escrow card
+  return (
     <div className="card card-bordered border-base-300 border-4 text-neutral-content">
       <div className="card-body items-center text-center">
         <div className="space-y-6">
@@ -123,28 +135,44 @@ function EscrowCard({ account }: { account: PublicKey }) {
               Maker: {maker}
             </h2>
             <h2 className=" justify-center text-md cursor-pointer text-primary">
-              Mint A (Taker Receives) {vaultAmount} of {mintA}
+              Mint X (Taker Receives) {vaultAmount} of {mintX}
             </h2>
             <h2 className=" justify-center text-md cursor-pointer text-primary">
-              Mint B (Maker Receives) {amount} of {mintB}
+              Mint Y (Maker Receives) {amount} of {mintY}
             </h2>
           </div>
           <div className="text-center space-y-4">
+            {/* Link to the escrow account on the explorer */}
             <p>
               <ExplorerLink
                 path={`account/${account}`}
                 label={ellipsify(account.toString())}
               />
             </p>
-            <button
-              className="btn btn-xs btn-secondary btn-outline"
-              onClick={() => {
-                return takeMutation.mutateAsync();
-              }}
-              disabled={takeMutation.isPending}
-            >
-              Take
-            </button>
+            <div className="flex flex-col gap-4">
+              {/* Button to take the escrow */}
+              <button
+                className="btn btn-xs btn-secondary btn-outline"
+                onClick={() => {
+                  return takeMutation.mutateAsync();
+                }}
+                disabled={takeMutation.isPending}
+              >
+                Take
+              </button>
+              {accountQuery.data?.maker.toString() ===
+                publicKey?.toString() && (
+                <button
+                  className="btn btn-xs btn-secondary btn-outline"
+                  onClick={() => {
+                    return refundMutation.mutateAsync();
+                  }}
+                  disabled={refundMutation.isPending}
+                >
+                  Refund
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
